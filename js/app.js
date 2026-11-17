@@ -12,6 +12,8 @@ import {
 } from './gestos.js';
 import { crearDetector } from './detector.js';
 import { ajustarLienzo, limpiar, dibujarMano } from './dibujo.js';
+import { INSTRUMENTOS, INSTRUMENTO_INICIAL } from './instrumentos.js';
+import { Sonido, VOLUMEN_INICIAL } from './sonido.js';
 
 // ---------- Configuración ----------
 
@@ -63,6 +65,9 @@ const avisoTexto = $('aviso-texto');
 const botonReintentar = $('reintentar');
 const botonCamara = $('cambiar-camara');
 const elMedidas = $('medidas');
+const elInstrumentos = $('instrumentos');
+const barraVolumen = $('volumen');
+const botonSonido = $('activar-sonido');
 
 // ---------- Estado ----------
 
@@ -77,6 +82,90 @@ let pistaActual = '';
 let ultimoTiempoDeVideo = -1;
 let fallosSeguidos = 0;
 let enMarcha = false;
+
+// ---------- Preferencias guardadas en el navegador ----------
+
+const CLAVE = 'senas-armonicas';
+
+function leerPreferencia(nombre) {
+  try {
+    return localStorage.getItem(`${CLAVE}:${nombre}`);
+  } catch {
+    return null;
+  }
+}
+
+function guardarPreferencia(nombre, valor) {
+  try {
+    localStorage.setItem(`${CLAVE}:${nombre}`, valor);
+  } catch {
+    // Sin almacenamiento disponible: la elección vale solo para esta visita.
+  }
+}
+
+// ---------- Sonido ----------
+
+const instrumentoGuardado = leerPreferencia('instrumento');
+const volumenGuardado = Number.parseFloat(leerPreferencia('volumen') ?? '');
+
+const sonido = new Sonido({
+  instrumento: INSTRUMENTOS[instrumentoGuardado] ? instrumentoGuardado : INSTRUMENTO_INICIAL,
+  volumen: volumenGuardado >= 0 && volumenGuardado <= 1 ? volumenGuardado : VOLUMEN_INICIAL,
+  alCambiarEstado: actualizarBotonDeSonido,
+});
+
+// El botón aparece solo si el navegador exige un toque para habilitar el audio.
+function actualizarBotonDeSonido() {
+  botonSonido.hidden = !enMarcha || sonido.activo;
+}
+
+function armarControles() {
+  for (const [clave, instrumento] of Object.entries(INSTRUMENTOS)) {
+    const opcion = document.createElement('label');
+    opcion.className = 'instrumentos__opcion';
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'instrumento';
+    radio.value = clave;
+    radio.checked = clave === sonido.instrumento;
+    radio.setAttribute('aria-label', instrumento.nombre);
+    radio.addEventListener('change', () => {
+      sonido.fijarInstrumento(clave);
+      guardarPreferencia('instrumento', clave);
+    });
+
+    const nombre = document.createElement('span');
+    nombre.className = 'instrumentos__nombre';
+    nombre.setAttribute('aria-hidden', 'true');
+    const largo = document.createElement('span');
+    largo.className = 'instrumentos__largo';
+    largo.textContent = instrumento.nombre;
+    const corto = document.createElement('span');
+    corto.className = 'instrumentos__corto';
+    corto.textContent = instrumento.corto;
+    nombre.append(largo, corto);
+
+    opcion.append(radio, nombre);
+    elInstrumentos.append(opcion);
+  }
+
+  const pintarVolumen = () => barraVolumen.style.setProperty('--lleno', `${barraVolumen.value}%`);
+  barraVolumen.value = Math.round(sonido.volumen * 100);
+  pintarVolumen();
+  barraVolumen.addEventListener('input', () => {
+    const volumen = barraVolumen.valueAsNumber / 100;
+    sonido.fijarVolumen(volumen);
+    guardarPreferencia('volumen', String(volumen));
+    pintarVolumen();
+  });
+
+  // Cualquier toque, clic o tecla sirve para habilitar el audio.
+  botonSonido.addEventListener('click', () => sonido.activar());
+  for (const evento of ['pointerdown', 'keydown']) {
+    document.addEventListener(evento, () => sonido.activar(), { passive: true });
+  }
+}
 
 const colorDe = (acorde) => COLOR_DE_NOTA[acorde.notas[0].replace(/[♯♭]/g, '')] ?? '#f7f0e3';
 
@@ -148,6 +237,16 @@ function mostrarAcorde(grado) {
   for (const item of elGuia.children) {
     item.setAttribute('aria-current', String(Number(item.dataset.grado) === grado));
   }
+
+  if (acorde) sonido.tocar(acorde);
+  else sonido.soltar();
+}
+
+/** Deja la pantalla y el sonido sin acorde (al pausar o ante un error). */
+function quedarSinAcorde() {
+  estabilizador.reiniciar();
+  dedos = null;
+  if (gradoActual !== null) mostrarAcorde(null);
 }
 
 function mostrarPista(texto) {
@@ -295,6 +394,8 @@ function cuadro() {
     console.error(error);
     if (++fallosSeguidos > 30) {
       enMarcha = false;
+      quedarSinAcorde();
+      actualizarBotonDeSonido();
       mostrarAviso('El reconocimiento de manos dejó de responder. Volvé a intentar.', { reintentar: true });
     }
     return;
@@ -306,6 +407,7 @@ function cuadro() {
 
 async function iniciar() {
   enMarcha = false;
+  actualizarBotonDeSonido();
   mostrarAviso('Preparando el reconocimiento de manos. Si el navegador lo pide, permití el uso de la cámara.');
 
   // El modelo y la cámara se preparan a la vez.
@@ -328,15 +430,25 @@ async function iniciar() {
 
   ocultarAviso();
   enMarcha = true;
+  // Se intenta habilitar el audio de entrada; si el navegador pide un toque,
+  // queda a la vista el botón "Activar sonido".
+  sonido.activar();
+  actualizarBotonDeSonido();
   requestAnimationFrame(cuadro);
 }
 
 armarGuia();
+armarControles();
 mostrarAcorde(null);
 mostrarPista(`Mostrá tu mano ${MANO.nombre} a la cámara.`);
 
 botonReintentar.addEventListener('click', iniciar);
 botonCamara.addEventListener('click', cambiarCamara);
 window.addEventListener('resize', () => ajustarLienzo(lienzo));
+// Con la pestaña oculta el video deja de analizarse: se corta el acorde
+// para que no quede sonando sin que nadie lo sostenga.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) quedarSinAcorde();
+});
 
 iniciar();

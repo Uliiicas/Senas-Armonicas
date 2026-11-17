@@ -160,6 +160,13 @@ export class Estabilizador {
     this.desde = 0;
   }
 
+  /** Vuelve al estado inicial, sin acorde. */
+  reiniciar() {
+    this.actual = null;
+    this.candidato = null;
+    this.desde = 0;
+  }
+
   /**
    * @param {number|null} valor Grado leído en este cuadro.
    * @param {number} ahora Tiempo en ms (performance.now()).

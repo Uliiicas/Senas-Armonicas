@@ -246,33 +246,182 @@ ol {
   color: var(--marfil-suave);
 }
 
-/* ---------- Botón para cambiar de cámara ---------- */
+/* ---------- Controles (arriba a la derecha) ---------- */
 
-.boton-camara {
+.solo-lectores {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.controles {
   position: absolute;
   z-index: 2;
   top: calc(var(--margen) + env(safe-area-inset-top));
   right: calc(var(--margen) + env(safe-area-inset-right));
   display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  padding: 0;
+  justify-items: end;
+  gap: 0.6rem;
+}
+
+.controles__fila {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.instrumentos,
+.volumen,
+.boton-camara {
   border: 1.5px solid var(--marfil-tenue);
-  border-radius: 50%;
   background: rgb(var(--velo) / 0.55);
-  color: var(--marfil);
-  cursor: pointer;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
-.boton-camara[hidden] {
+/* Selector de instrumento: una opción activa por vez. */
+.instrumentos {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 3px;
+  border-radius: 1.4rem;
+}
+
+.instrumentos__opcion {
+  position: relative;
+  cursor: pointer;
+}
+
+.instrumentos__opcion input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.instrumentos__nombre {
+  display: block;
+  padding: 0.55em 1em;
+  border-radius: 999px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--marfil-suave);
+}
+
+.instrumentos__opcion input:checked + .instrumentos__nombre {
+  background: var(--marfil);
+  color: rgb(var(--velo));
+}
+
+.instrumentos__opcion input:focus-visible + .instrumentos__nombre {
+  outline: 2px solid var(--marfil);
+  outline-offset: 3px;
+}
+
+.instrumentos__corto {
+  display: none;
+}
+
+/* Barra de volumen. */
+.volumen {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.9rem 0 0.7rem;
+  border-radius: 999px;
+  color: var(--marfil);
+}
+
+.volumen svg {
+  flex: none;
+}
+
+.volumen input {
+  --lleno: 60%;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 9.5rem;
+  height: 1.5rem;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.volumen input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--marfil) var(--lleno), var(--marfil-tenue) var(--lleno));
+}
+
+.volumen input::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--marfil) var(--lleno), var(--marfil-tenue) var(--lleno));
+}
+
+.volumen input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--marfil);
+}
+
+.volumen input::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--marfil);
+}
+
+.volumen input:focus-visible {
+  outline: 2px solid var(--marfil);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
+.boton-camara {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--marfil);
+  cursor: pointer;
+}
+
+.boton-camara[hidden],
+.boton-sonido[hidden] {
   display: none;
 }
 
 .boton-camara:hover {
   border-color: var(--marfil);
+}
+
+/* Aparece solo si el navegador pide un toque para habilitar el audio. */
+.boton-sonido {
+  padding: 0.6em 1.1em;
+  border: 0;
+  border-radius: 999px;
+  background: var(--marfil);
+  color: rgb(var(--velo));
+  font: 600 0.9375rem/1.2 var(--letra-texto);
+  cursor: pointer;
 }
 
 :focus-visible {
@@ -441,6 +590,42 @@ ol {
 /* ---------- Pantallas bajas (celular acostado) ---------- */
 
 @media (max-width: 30rem) {
+  /* En pantallas angostas los controles se apilan en una columna fina. */
+  .acorde {
+    max-width: calc(100% - 2 * var(--margen) - 8.75rem);
+  }
+
+  .acorde__nombre {
+    flex-wrap: wrap;
+    row-gap: 0.3em;
+  }
+
+  .instrumentos {
+    flex-direction: column;
+    align-self: end;
+  }
+
+  .instrumentos__nombre {
+    text-align: center;
+  }
+
+  .instrumentos__largo {
+    display: none;
+  }
+
+  .instrumentos__corto {
+    display: inline;
+  }
+
+  .controles__fila {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .volumen input {
+    width: 4.5rem;
+  }
+
   .guia {
     --trazo: 4px;
     gap: 0.3rem;
