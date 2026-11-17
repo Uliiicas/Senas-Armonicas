@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Elegí acordes de una escala con señas de la mano derecha frente a la cámara.">
+  <title>Señas Armónicas</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <main class="escenario" id="escenario" data-espejo="si">
+    <video id="camara" class="camara" autoplay playsinline muted></video>
+    <canvas id="trazo" class="trazo" aria-hidden="true"></canvas>
+
+    <section class="acorde" id="acorde" data-vacio="si" aria-live="polite" aria-atomic="true">
+      <p class="acorde__escala">Escala de <span id="escala">Do Mayor</span></p>
+      <p class="acorde__grado" id="grado" aria-hidden="true"></p>
+      <p class="acorde__nombre">
+        <span id="nombre">Sin acorde</span>
+        <span class="acorde__cifrado" id="cifrado"></span>
+      </p>
+      <p class="acorde__detalle" id="detalle"></p>
+    </section>
+
+    <button class="boton-camara" id="cambiar-camara" type="button" hidden aria-label="Cambiar de cámara">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.2l1.2-1.8h6.2L16.3 6h1.2A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"/>
+        <path d="M9.2 12.2a3 3 0 0 1 5.3-1.4M14.8 13a3 3 0 0 1-5.3 1.4"/>
+        <path d="M14.6 9.2v1.8h-1.8M9.4 16v-1.8h1.8"/>
+      </svg>
+    </button>
+
+    <ol class="guia" id="guia" aria-label="Señas de cada acorde"></ol>
+
+    <div class="aviso" id="aviso" role="status">
+      <p class="aviso__titulo">Señas Armónicas</p>
+      <p class="aviso__texto" id="aviso-texto">Preparando el reconocimiento de manos…</p>
+      <button class="aviso__boton" id="reintentar" type="button" hidden>Volver a intentar</button>
+    </div>
+
+    <pre class="medidas" id="medidas" hidden></pre>
+  </main>
+
+  <noscript>Esta aplicación necesita JavaScript para usar la cámara.</noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,476 @@
+/*
+  Señas Armónicas
+  La cámara es la página. Todo lo demás es tinta marfil sobre el video,
+  y un solo color que cambia con el acorde: el de su nota fundamental,
+  como en los instrumentos de colores con los que se enseña música.
+*/
+
+/* Tipografías alojadas en el propio sitio (licencia SIL OFL, ver /fuentes). */
+
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fuentes/bodoni-moda-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../fuentes/bodoni-moda-latin-700-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fuentes/bodoni-moda-latin-500-italic.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fuentes/instrument-sans-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("../fuentes/instrument-sans-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fuentes/instrument-sans-latin-600-normal.woff2") format("woff2");
+}
+
+:root {
+  --marfil: #f7f0e3;
+  --marfil-suave: rgb(247 240 227 / 0.72);
+  --marfil-tenue: rgb(247 240 227 / 0.3);
+  --velo: 16 9 26; /* berenjena muy oscura, para dar contraste sobre el video */
+  --acento: var(--marfil);
+
+  --letra-titulo: "Bodoni Moda", "Bodoni 72", Didot, "Times New Roman", serif;
+  --letra-texto: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+
+  --margen: clamp(1rem, 3.2vmin, 2.25rem);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  color: var(--marfil);
+  font-family: var(--letra-texto);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+}
+
+p,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Cámara a pantalla completa ---------- */
+
+.escenario {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.camara,
+.trazo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.camara {
+  object-fit: cover;
+}
+
+.trazo {
+  pointer-events: none;
+}
+
+/* La cámara frontal se muestra como un espejo; el trazo de la mano la acompaña. */
+.escenario[data-espejo="si"] .camara,
+.escenario[data-espejo="si"] .trazo {
+  transform: scaleX(-1);
+}
+
+/* Velos para que el texto se lea sobre cualquier fondo. */
+.escenario::before,
+.escenario::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.escenario::before {
+  inset: 0 auto auto 0;
+  width: min(100%, 46rem);
+  height: min(78%, 34rem);
+  background: radial-gradient(
+    ellipse at top left,
+    rgb(var(--velo) / 0.82) 0%,
+    rgb(var(--velo) / 0.5) 38%,
+    rgb(var(--velo) / 0) 70%
+  );
+}
+
+.escenario::after {
+  inset: auto 0 0 0;
+  height: clamp(8rem, 26vh, 13rem);
+  background: linear-gradient(to top, rgb(var(--velo) / 0.8), rgb(var(--velo) / 0));
+}
+
+/* ---------- Acorde en uso (arriba a la izquierda) ---------- */
+
+.acorde {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--margen) + env(safe-area-inset-top));
+  left: calc(var(--margen) + env(safe-area-inset-left));
+  max-width: calc(100% - 2 * var(--margen) - 4rem);
+  text-shadow: 0 1px 14px rgb(var(--velo) / 0.7);
+}
+
+.acorde__escala {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--marfil-suave);
+}
+
+.acorde__grado {
+  margin-top: 0.1em;
+  font-family: var(--letra-titulo);
+  font-weight: 700;
+  font-size: clamp(5.5rem, 24vmin, 12.5rem);
+  line-height: 0.92;
+  letter-spacing: -0.01em;
+  color: var(--acento);
+  font-variant-numeric: lining-nums;
+  transform-origin: left 70%;
+}
+
+.acorde__grado.entra {
+  animation: entra 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@keyframes entra {
+  from {
+    transform: scale(0.86);
+    opacity: 0.35;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.acorde__nombre {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  margin-top: 0.15em;
+  font-family: var(--letra-titulo);
+  font-weight: 500;
+  font-size: clamp(1.75rem, 5.2vmin, 2.75rem);
+  line-height: 1.1;
+}
+
+.acorde__cifrado {
+  font-family: var(--letra-texto);
+  font-weight: 600;
+  font-size: 0.5em;
+  padding: 0.18em 0.55em;
+  border: 1.5px solid var(--acento);
+  border-radius: 999px;
+  color: var(--acento);
+  text-shadow: none;
+}
+
+.acorde__cifrado:empty {
+  display: none;
+}
+
+.acorde__detalle {
+  margin-top: 0.5em;
+  font-size: clamp(1rem, 2.6vmin, 1.25rem);
+  line-height: 1.4;
+  color: var(--marfil-suave);
+  max-width: 22em;
+}
+
+.acorde__detalle span + span {
+  margin-left: 0.9em;
+}
+
+/* Sin acorde: no hay número; el nombre baja de volumen. */
+.acorde[data-vacio="si"] .acorde__grado {
+  display: none;
+}
+
+.acorde[data-vacio="si"] .acorde__nombre {
+  margin-top: 0.35em;
+  font-style: italic;
+  color: var(--marfil-suave);
+}
+
+/* ---------- Botón para cambiar de cámara ---------- */
+
+.boton-camara {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--margen) + env(safe-area-inset-top));
+  right: calc(var(--margen) + env(safe-area-inset-right));
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1.5px solid var(--marfil-tenue);
+  border-radius: 50%;
+  background: rgb(var(--velo) / 0.55);
+  color: var(--marfil);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.boton-camara[hidden] {
+  display: none;
+}
+
+.boton-camara:hover {
+  border-color: var(--marfil);
+}
+
+:focus-visible {
+  outline: 2px solid var(--marfil);
+  outline-offset: 3px;
+}
+
+/* ---------- Guía de señas (abajo) ---------- */
+
+.guia {
+  --trazo: 5px; /* ancho de cada dedo del dibujo */
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(var(--margen) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  gap: clamp(0.4rem, 2.6vw, 1.75rem);
+  list-style: none;
+  max-width: calc(100% - 2 * var(--margen));
+}
+
+.guia__sena {
+  --color: var(--marfil);
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  opacity: 0.62;
+  transition: opacity 120ms ease;
+}
+
+.guia__sena[aria-current="true"] {
+  opacity: 1;
+}
+
+/* Una mano en cinco trazos: altos los dedos levantados, cortos los plegados. */
+.guia__mano {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--trazo) * 0.6);
+  height: 1.75rem;
+  /* Lugar para el pulgar, que se abre hacia la izquierda. */
+  padding-left: calc(var(--trazo) * 2.6);
+}
+
+.guia__dedo {
+  width: var(--trazo);
+  height: 0.45rem;
+  border-radius: var(--trazo);
+  background: var(--marfil-tenue);
+}
+
+.guia__dedo[data-arriba="si"] {
+  height: 100%;
+  background: var(--marfil);
+}
+
+.guia__dedo:nth-child(3)[data-arriba="si"] {
+  height: 100%;
+}
+
+.guia__dedo:nth-child(2)[data-arriba="si"],
+.guia__dedo:nth-child(4)[data-arriba="si"] {
+  height: 90%;
+}
+
+.guia__dedo:nth-child(5)[data-arriba="si"] {
+  height: 72%;
+}
+
+/* El pulgar sale hacia el costado. */
+.guia__dedo:first-child {
+  transform-origin: 50% 100%;
+  transform: translateY(-0.3rem) rotate(-52deg);
+  margin-right: 1px;
+}
+
+.guia__dedo:first-child[data-arriba="si"] {
+  height: 62%;
+}
+
+.guia__sena[aria-current="true"] .guia__dedo[data-arriba="si"] {
+  background: var(--color);
+}
+
+.guia__grado {
+  font-family: var(--letra-titulo);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  line-height: 1;
+}
+
+.guia__sena[aria-current="true"] .guia__grado {
+  color: var(--color);
+}
+
+/* ---------- Avisos: carga, permisos y errores ---------- */
+
+.aviso {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.9rem;
+  padding: 2rem;
+  text-align: center;
+  background: rgb(var(--velo) / 0.9);
+  transition: opacity 260ms ease, visibility 260ms;
+}
+
+.aviso[data-oculto="si"] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.aviso__titulo {
+  font-family: var(--letra-titulo);
+  font-weight: 700;
+  font-size: clamp(2.25rem, 8vmin, 3.75rem);
+  line-height: 1.05;
+}
+
+.aviso__texto {
+  max-width: 30em;
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  color: var(--marfil-suave);
+}
+
+.aviso__boton {
+  margin-top: 0.4rem;
+  padding: 0.7em 1.5em;
+  border: 0;
+  border-radius: 999px;
+  background: var(--marfil);
+  color: rgb(var(--velo));
+  font: 600 1rem var(--letra-texto);
+  cursor: pointer;
+}
+
+.aviso__boton[hidden] {
+  display: none;
+}
+
+/* ---------- Medidas en vivo (solo con ?debug) ---------- */
+
+.medidas {
+  position: absolute;
+  z-index: 2;
+  right: var(--margen);
+  bottom: calc(var(--margen) + 5.5rem);
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  background: rgb(var(--velo) / 0.75);
+  font: 500 0.8125rem/1.5 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--marfil);
+}
+
+.medidas[hidden] {
+  display: none;
+}
+
+/* ---------- Pantallas bajas (celular acostado) ---------- */
+
+@media (max-width: 30rem) {
+  .guia {
+    --trazo: 4px;
+    gap: 0.3rem;
+  }
+}
+
+@media (max-height: 30rem) {
+  .acorde__grado {
+    font-size: clamp(4rem, 30vh, 7rem);
+  }
+
+  .acorde__detalle {
+    margin-top: 0.25em;
+  }
+
+  .guia {
+    left: auto;
+    right: calc(var(--margen) + env(safe-area-inset-right));
+    transform: none;
+    gap: 0.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acorde__grado.entra {
+    animation: none;
+  }
+
+  .aviso,
+  .guia__sena {
+    transition: none;
+  }
+}

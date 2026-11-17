@@ -1,0 +1,11 @@
+{
+  "name": "senas-armonicas",
+  "version": "0.1.0",
+  "description": "Aplicación web que reconoce señas de la mano con la cámara y las convierte en acordes de una escala",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve -l 8080 .",
+    "test": "node --test"
+  }
+}
