@@ -8,8 +8,11 @@ import {
   gradoDeLaSena,
   elegirMano,
   Estabilizador,
+  medirInclinacion,
+  actualizarVariante,
+  esSoloPulgar,
 } from '../js/gestos.js';
-import { manoLocal, girar, conRuido, azarConSemilla, formaDeLaSena } from './mano-sintetica.mjs';
+import { manoLocal, girar, conRuido, azarConSemilla, formaDeLaSena, aImagen } from './mano-sintetica.mjs';
 
 const leer = (puntos, anterior = null) => gradoDeLaSena(actualizarDedos(anterior, medirDedos(puntos)));
 
@@ -106,4 +109,84 @@ test('el estabilizador ignora señas fugaces y demora un poco más el silencio',
   assert.equal(e.actualizar(null, 730), 5);
   assert.equal(e.actualizar(5, 760), 5);
   assert.equal(e.actualizar(null, 900), 5, 'el contador de silencio arranca de nuevo');
+});
+
+// Mano girada `grados` en el plano de la imagen (positivo = hacia la derecha
+// de la imagen), con sus puntos 3D y su proyección como la daría MediaPipe.
+const ASPECTO = 16 / 9;
+function manoInclinada(patron, grados, extra = [0, 0]) {
+  const mundo = girar(manoLocal(formaDeLaSena(patron)), [extra[0], extra[1], (-grados * Math.PI) / 180]);
+  return { mundo, imagen: aImagen(mundo, { aspecto: ASPECTO }) };
+}
+
+test('medirInclinacion da el giro de la mano en la imagen', () => {
+  for (const [grado, patron] of Object.entries(SENAS)) {
+    if (Number(grado) === 6) continue;
+    for (const grados of [-60, -30, -10, 0, 10, 30, 60]) {
+      const { mundo, imagen } = manoInclinada(patron, grados);
+      const medida = medirInclinacion(imagen, mundo, ASPECTO);
+      // El modelo de mano no es simétrico: el nudillo del medio queda apenas corrido.
+      assert.ok(Math.abs(medida.grados - grados) < 4, `grado ${grado} a ${grados}°: ${medida.grados.toFixed(1)}`);
+      assert.equal(medida.referencia, 'eje');
+    }
+  }
+});
+
+test('inclinar la mano no cambia qué dedos se leen', () => {
+  for (const [grado, patron] of Object.entries(SENAS)) {
+    for (const grados of [-50, -30, 30, 50]) {
+      const { mundo } = manoInclinada(patron, grados);
+      assert.equal(leer(mundo), Number(grado), `grado ${grado} a ${grados}°`);
+    }
+  }
+});
+
+test('solo pulgar con la mano levantada: la referencia es el eje de la mano', () => {
+  for (const grados of [-50, -30, 0, 30, 50]) {
+    const { mundo, imagen } = manoInclinada(SENAS[6], grados);
+    const dedos = actualizarDedos(null, medirDedos(mundo));
+    assert.ok(esSoloPulgar(dedos));
+    const medida = medirInclinacion(imagen, mundo, ASPECTO, { soloPulgar: true });
+    assert.equal(medida.referencia, 'eje', `a ${grados}°`);
+    assert.ok(Math.abs(medida.grados - grados) < 4);
+  }
+});
+
+test('solo pulgar con el puño hacia la cámara: la referencia es el pulgar', () => {
+  // Puño volcado hacia la cámara: el eje muñeca-nudillo casi no se ve.
+  const { mundo, imagen } = manoInclinada(SENAS[6], 0, [1.2, 0]);
+  const medida = medirInclinacion(imagen, mundo, ASPECTO, { soloPulgar: true });
+  assert.equal(medida.referencia, 'pulgar');
+  const pulgarEnReposo = medida.grados;
+  for (const grados of [-35, 35]) {
+    const girada = manoInclinada(SENAS[6], grados, [1.2, 0]);
+    const m = medirInclinacion(girada.imagen, girada.mundo, ASPECTO, { soloPulgar: true });
+    assert.equal(m.referencia, 'pulgar');
+    assert.ok(Math.abs(m.grados - pulgarEnReposo - grados) < 1, `${m.grados.toFixed(1)} a ${grados}°`);
+  }
+});
+
+test('otra seña apuntando a la cámara: no se interpreta inclinación', () => {
+  const { mundo, imagen } = manoInclinada(SENAS[1], 40, [1.2, 0]);
+  assert.deepEqual(medirInclinacion(imagen, mundo, ASPECTO), { grados: 0, referencia: null });
+});
+
+test('la referencia elegida se conserva mientras dura la seña', () => {
+  const { mundo, imagen } = manoInclinada(SENAS[6], 30, [1.2, 0]);
+  const fijada = medirInclinacion(imagen, mundo, ASPECTO, { soloPulgar: true, referencia: 'eje' });
+  assert.equal(fijada.referencia, 'eje');
+});
+
+test('actualizarVariante: afuera es sus4, adentro es sus2, con histéresis', () => {
+  assert.equal(actualizarVariante(null, 0), null);
+  assert.equal(actualizarVariante(null, 20), null, 'en la franja intermedia no entra');
+  assert.equal(actualizarVariante(null, 26), 'sus4');
+  assert.equal(actualizarVariante('sus4', 20), 'sus4', 'en la franja intermedia se sostiene');
+  assert.equal(actualizarVariante('sus4', 16), null);
+  assert.equal(actualizarVariante(null, -26), 'sus2');
+  assert.equal(actualizarVariante('sus2', -20), 'sus2');
+  assert.equal(actualizarVariante('sus2', -16), null);
+  assert.equal(actualizarVariante('sus4', -20), null, 'no se hereda el lado contrario');
+  assert.equal(actualizarVariante('sus2', 40), 'sus4');
+  assert.equal(actualizarVariante('sus4', 170), null, 'mano cabeza abajo: no se interpreta');
 });

@@ -17,6 +17,23 @@ const CALIDADES = {
   '4-8': { nombre: 'aumentado', sufijo: '+', romano: (r) => `${r}+` },
 };
 
+/**
+ * Acordes suspendidos: la tercera se reemplaza por la segunda mayor (sus2)
+ * o por la cuarta justa (sus4) sobre la fundamental. `letras` es cuántas
+ * letras se sube desde la fundamental y `semitonos`, cuántos semitonos.
+ */
+export const SUSPENSIONES = {
+  sus2: { letras: 1, semitonos: 2 },
+  sus4: { letras: 3, semitonos: 5 },
+};
+
+/** Alteración que necesita una letra para sonar a cierta altura. */
+function alteracionPara(letra, altura) {
+  let alt = (((altura - SEMITONOS_NATURALES[letra]) % 12) + 12) % 12;
+  if (alt > 6) alt -= 12;
+  return alt;
+}
+
 function signoDeAlteracion(cantidad) {
   if (cantidad > 0) return '♯'.repeat(cantidad);
   if (cantidad < 0) return '♭'.repeat(-cantidad);
@@ -44,10 +61,9 @@ export function construirEscala({ tonica, alteracion = 0, modo = 'mayor', octava
   const notas = definicion.intervalos.map((intervalo, i) => {
     const letra = (letraTonica + i) % 7;
     const altura = alturaTonica + intervalo;
-    let alt = (((altura - SEMITONOS_NATURALES[letra]) % 12) + 12) % 12;
-    if (alt > 6) alt -= 12;
-    const signo = signoDeAlteracion(alt);
+    const signo = signoDeAlteracion(alteracionPara(letra, altura));
     return {
+      letra,
       nombre: LETRAS[letra] + signo,
       cifrado: LETRAS_CIFRADO[letra] + signo,
       altura, // semitonos desde el Do de la octava de la tónica
@@ -62,15 +78,36 @@ export function construirEscala({ tonica, alteracion = 0, modo = 'mayor', octava
     const clave = `${alturaTercera - raiz.altura}-${alturaQuinta - raiz.altura}`;
     const calidad = CALIDADES[clave];
     const baseMidi = 12 * (octava + 1);
+
+    // Variantes suspendidas: misma fundamental y misma quinta, sin tercera.
+    // Con la quinta disminuida (grado vii°) se aclara en el nombre.
+    const quintaJusta = alturaQuinta - raiz.altura === 7;
+    const variantes = {};
+    for (const [tipo, { letras, semitonos }] of Object.entries(SUSPENSIONES)) {
+      const letra = (raiz.letra + letras) % 7;
+      const signo = signoDeAlteracion(alteracionPara(letra, raiz.altura + semitonos));
+      variantes[tipo] = {
+        grado: i + 1,
+        variante: tipo,
+        romano: ROMANOS[i],
+        nombre: `${raiz.nombre} ${tipo}${quintaJusta ? '' : ' (♭5)'}`,
+        cifrado: `${raiz.cifrado}${tipo}${quintaJusta ? '' : '(♭5)'}`,
+        calidad: tipo,
+        notas: [raiz.nombre, LETRAS[letra] + signo, quinta.nombre],
+        midi: [raiz.altura, raiz.altura + semitonos, alturaQuinta].map((a) => baseMidi + a),
+      };
+    }
+
     return {
       grado: i + 1,
+      variante: null,
       romano: calidad.romano(ROMANOS[i]),
       nombre: `${raiz.nombre} ${calidad.nombre}`,
       cifrado: raiz.cifrado + calidad.sufijo,
       calidad: calidad.nombre,
       notas: [raiz.nombre, tercera.nombre, quinta.nombre],
-      // Listo para cuando la app tenga sonido.
       midi: [raiz.altura, alturaTercera, alturaQuinta].map((a) => baseMidi + a),
+      variantes,
     };
   });
 

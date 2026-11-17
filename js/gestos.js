@@ -46,6 +46,10 @@ export const UMBRALES = {
   // Cuánto se separa la punta del pulgar hacia afuera de la palma,
   // en anchos de palma: ~1 = pulgar abierto, <0.3 = pegado o cruzado.
   pulgar: { levantado: 0.58, plegado: 0.4 },
+  // Inclinación lateral de la mano, en grados desde la vertical. El acorde
+  // pasa a suspendido al superar `entrar` y vuelve al bajar de `salir`.
+  // Más allá de `tope` la mano está casi cabeza abajo y no se interpreta.
+  inclinacion: { entrar: 25, salir: 17, tope: 135 },
 };
 
 const resta = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
@@ -118,6 +122,63 @@ export function gradoDeLaSena(dedos) {
     if (DEDOS.every((dedo, i) => dedos[dedo] === patron[i])) return Number(grado);
   }
   return null;
+}
+
+/**
+ * Inclinación lateral de la mano tal como la ve la cámara: el giro, en el
+ * plano de la imagen, de la línea que va de la muñeca al nudillo del dedo
+ * medio (el eje de la mano, que sigue al antebrazo sin importar qué dedos
+ * estén levantados). 0° = hacia arriba; positivo = hacia la derecha de la imagen.
+ *
+ * Si la mano apunta hacia la cámara, ese eje casi no se ve en la imagen y su
+ * giro no dice nada. En ese caso, con la seña de solo pulgar (el "pulgar
+ * arriba" hecho hacia la cámara) se mide la dirección del pulgar; con las
+ * demás señas no se interpreta inclinación. La referencia elegida se conserva
+ * mientras dure la seña (`referencia`), para que no salte a mitad de un giro.
+ *
+ * @param {Array<{x:number,y:number}>} imagen Puntos normalizados de MediaPipe (0 a 1).
+ * @param {Array<{x:number,y:number,z:number}>} mundo Puntos 3D de la misma mano.
+ * @param {number} aspecto Ancho / alto del cuadro de video.
+ * @param {object} [opciones]
+ * @param {boolean} [opciones.soloPulgar] Si la seña actual es la de solo pulgar.
+ * @param {'eje'|'pulgar'|null} [opciones.referencia] Referencia ya elegida para esta seña.
+ * @returns {{grados:number, referencia:'eje'|'pulgar'|null}} referencia null = sin inclinación legible.
+ */
+export function medirInclinacion(imagen, mundo, aspecto, { soloPulgar = false, referencia = null } = {}) {
+  const angulo = (desde, hasta) => {
+    const dx = (imagen[hasta].x - imagen[desde].x) * aspecto;
+    const dy = imagen[hasta].y - imagen[desde].y; // en la imagen, y crece hacia abajo
+    return (Math.atan2(dx, -dy) * 180) / Math.PI;
+  };
+
+  let elegida = referencia;
+  if (!elegida) {
+    const eje = resta(mundo[9], mundo[0]);
+    const deFrente = Math.hypot(eje.x, eje.y) < 0.55 * largo(eje);
+    elegida = deFrente ? 'pulgar' : 'eje';
+  }
+  if (elegida === 'pulgar' && !soloPulgar) return { grados: 0, referencia: null };
+  return { grados: elegida === 'pulgar' ? angulo(2, 4) : angulo(0, 9), referencia: elegida };
+}
+
+/**
+ * Decide si el acorde va suspendido según la inclinación, con histéresis.
+ * @param {'sus2'|'sus4'|null} anterior Estado del cuadro anterior.
+ * @param {number} haciaAfuera Grados de inclinación; positivo = hacia afuera del cuerpo.
+ * @returns {'sus2'|'sus4'|null} sus4 hacia afuera, sus2 hacia adentro, null con la mano derecha.
+ */
+export function actualizarVariante(anterior, haciaAfuera, umbrales = UMBRALES.inclinacion) {
+  const magnitud = Math.abs(haciaAfuera);
+  if (magnitud > umbrales.tope) return null;
+  const lado = haciaAfuera > 0 ? 'sus4' : 'sus2';
+  if (magnitud >= umbrales.entrar) return lado;
+  if (magnitud >= umbrales.salir && anterior === lado) return lado;
+  return null;
+}
+
+/** Indica si los dedos forman la seña de solo pulgar. */
+export function esSoloPulgar(dedos) {
+  return dedos.pulgar && !dedos.indice && !dedos.medio && !dedos.anular && !dedos.menique;
 }
 
 /**

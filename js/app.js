@@ -9,6 +9,10 @@ import {
   gradoDeLaSena,
   elegirMano,
   Estabilizador,
+  UMBRALES,
+  medirInclinacion,
+  actualizarVariante,
+  esSoloPulgar,
 } from './gestos.js';
 import { crearDetector } from './detector.js';
 import { ajustarLienzo, limpiar, dibujarMano } from './dibujo.js';
@@ -65,6 +69,9 @@ const avisoTexto = $('aviso-texto');
 const botonReintentar = $('reintentar');
 const botonCamara = $('cambiar-camara');
 const elMedidas = $('medidas');
+const elInclinacion = $('inclinacion');
+const ladoIzquierdo = $('lado-izquierdo');
+const ladoDerecho = $('lado-derecho');
 const elInstrumentos = $('instrumentos');
 const barraVolumen = $('volumen');
 const botonSonido = $('activar-sonido');
@@ -77,7 +84,12 @@ const estabilizador = new Estabilizador();
 let detector = null;
 let orientacion = 'user'; // 'user' = cámara frontal, 'environment' = trasera
 let dedos = null; // dedos levantados de la mano que se está leyendo
-let gradoActual; // undefined hasta el primer dibujo; después 1 a 7 o null
+// Acorde en pantalla: undefined hasta el primer dibujo; después null o una
+// clave como '4' (grado IV) o '4:sus2' (grado IV suspendido).
+let claveActual;
+let variante = null; // 'sus2', 'sus4' o null según la inclinación de la mano
+let referenciaDelPulgar = null; // referencia de inclinación mientras dura la seña de solo pulgar
+let inclinacionSuave = 0; // inclinación en pantalla, suavizada para el indicador
 let pistaActual = '';
 let ultimoTiempoDeVideo = -1;
 let fallosSeguidos = 0;
@@ -167,6 +179,9 @@ function armarControles() {
   }
 }
 
+// Grados de inclinación que abarca el indicador hacia cada lado.
+const RANGO_DEL_INDICADOR = 60;
+
 const colorDe = (acorde) => COLOR_DE_NOTA[acorde.notas[0].replace(/[♯♭]/g, '')] ?? '#f7f0e3';
 
 // ---------- Pantalla ----------
@@ -204,15 +219,29 @@ function armarGuia() {
   );
 }
 
-function mostrarAcorde(grado) {
-  gradoActual = grado;
-  const acorde = grado === null ? null : escala.acordes[grado - 1];
+/** Acorde que corresponde a una clave ('4', '4:sus2', ...) o null. */
+function acordeDe(clave) {
+  if (clave === null || clave === undefined) return null;
+  const [grado, tipo] = clave.split(':');
+  const base = escala.acordes[Number(grado) - 1];
+  return tipo ? base.variantes[tipo] : base;
+}
+
+function mostrarAcorde(clave) {
+  claveActual = clave;
+  const acorde = acordeDe(clave);
 
   panel.dataset.vacio = acorde ? 'no' : 'si';
   escenario.style.setProperty('--acento', acorde ? colorDe(acorde) : 'var(--marfil)');
 
   if (acorde) {
     elGrado.textContent = acorde.romano;
+    if (acorde.variante) {
+      const etiqueta = document.createElement('span');
+      etiqueta.className = 'acorde__sus';
+      etiqueta.textContent = acorde.variante;
+      elGrado.append(etiqueta);
+    }
     elNombre.textContent = acorde.nombre;
     elCifrado.textContent = acorde.cifrado;
     elDetalle.replaceChildren(
@@ -235,7 +264,7 @@ function mostrarAcorde(grado) {
   }
 
   for (const item of elGuia.children) {
-    item.setAttribute('aria-current', String(Number(item.dataset.grado) === grado));
+    item.setAttribute('aria-current', String(Number(item.dataset.grado) === acorde?.grado));
   }
 
   if (acorde) sonido.tocar(acorde);
@@ -246,13 +275,41 @@ function mostrarAcorde(grado) {
 function quedarSinAcorde() {
   estabilizador.reiniciar();
   dedos = null;
-  if (gradoActual !== null) mostrarAcorde(null);
+  variante = null;
+  referenciaDelPulgar = null;
+  if (claveActual !== null) mostrarAcorde(null);
+  mostrarInclinacion(null);
+}
+
+/**
+ * Indicador de inclinación: un punto que se mueve con la mano entre los dos
+ * lados. Las etiquetas se ubican según hacia dónde se ve "afuera" en pantalla.
+ * @param {number|null} gradosEnImagen Inclinación medida en la imagen, o null sin mano.
+ */
+function mostrarInclinacion(gradosEnImagen) {
+  const espejado = escenario.dataset.espejo === 'si';
+  // Afuera del cuerpo es la derecha de la persona con la mano derecha, que en
+  // el cuadro sin espejar queda a la izquierda; el espejo lo vuelve a la derecha.
+  const afueraALaDerecha = (MANO.etiqueta === 'Right') === espejado;
+  const derecha = afueraALaDerecha ? 'sus4' : 'sus2';
+  if (ladoDerecho.textContent !== derecha) {
+    ladoDerecho.textContent = derecha;
+    ladoIzquierdo.textContent = afueraALaDerecha ? 'sus2' : 'sus4';
+  }
+  ladoDerecho.dataset.activo = variante === ladoDerecho.textContent ? 'si' : 'no';
+  ladoIzquierdo.dataset.activo = variante === ladoIzquierdo.textContent ? 'si' : 'no';
+
+  elInclinacion.dataset.mano = gradosEnImagen === null ? 'no' : 'si';
+  const enPantalla = gradosEnImagen === null ? 0 : espejado ? -gradosEnImagen : gradosEnImagen;
+  inclinacionSuave = gradosEnImagen === null ? 0 : inclinacionSuave + 0.5 * (enPantalla - inclinacionSuave);
+  const posicion = 50 + (Math.max(-RANGO_DEL_INDICADOR, Math.min(RANGO_DEL_INDICADOR, inclinacionSuave)) / RANGO_DEL_INDICADOR) * 50;
+  elInclinacion.style.setProperty('--posicion', `${posicion.toFixed(1)}%`);
 }
 
 function mostrarPista(texto) {
   if (texto === pistaActual) return;
   pistaActual = texto;
-  if (gradoActual === null) elDetalle.textContent = texto;
+  if (claveActual === null) elDetalle.textContent = texto;
 }
 
 function mostrarAviso(texto, { reintentar = false } = {}) {
@@ -342,18 +399,35 @@ function procesar(resultado, ahora) {
   const { indice, hayOtraMano } = elegirMano(resultado, MANO.etiqueta);
   let grado = null;
   let medidas = null;
+  let inclinacion = null;
 
   if (indice >= 0) {
     // Los puntos "world" están en metros y no se deforman con la perspectiva.
-    medidas = medirDedos(resultado.worldLandmarks[indice]);
+    const mundo = resultado.worldLandmarks[indice];
+    medidas = medirDedos(mundo);
     dedos = actualizarDedos(dedos, medidas);
     grado = gradoDeLaSena(dedos);
+
+    // Inclinación lateral de la mano: afuera del cuerpo = sus4, adentro = sus2.
+    const soloPulgar = esSoloPulgar(dedos);
+    inclinacion = medirInclinacion(resultado.landmarks[indice], mundo, video.videoWidth / video.videoHeight, {
+      soloPulgar,
+      referencia: soloPulgar ? referenciaDelPulgar : null,
+    });
+    referenciaDelPulgar = soloPulgar ? inclinacion.referencia : null;
+    // En el cuadro sin espejar, la derecha de la persona queda a la izquierda.
+    const haciaAfuera = MANO.etiqueta === 'Right' ? -inclinacion.grados : inclinacion.grados;
+    variante = actualizarVariante(variante, haciaAfuera);
   } else {
     dedos = null;
+    variante = null;
+    referenciaDelPulgar = null;
   }
 
-  const estable = estabilizador.actualizar(grado, ahora);
-  if (estable !== gradoActual) mostrarAcorde(estable);
+  const clave = grado === null ? null : variante ? `${grado}:${variante}` : String(grado);
+  const estable = estabilizador.actualizar(clave, ahora);
+  if (estable !== claveActual) mostrarAcorde(estable);
+  mostrarInclinacion(inclinacion ? inclinacion.grados : null);
 
   if (indice >= 0) {
     // Mientras una seña válida se está por confirmar, no se cambia el texto.
@@ -364,7 +438,7 @@ function procesar(resultado, ahora) {
   // Trazo de las manos sobre el video.
   ajustarLienzo(lienzo);
   limpiar(lienzo);
-  const acorde = estable === null ? null : escala.acordes[estable - 1];
+  const acorde = acordeDe(estable);
   (resultado.landmarks ?? []).forEach((puntos, i) => {
     if (i === indice) dibujarMano(lienzo, video, puntos, { dedos, color: acorde ? colorDe(acorde) : '#f7f0e3' });
     else dibujarMano(lienzo, video, puntos);
@@ -373,7 +447,10 @@ function procesar(resultado, ahora) {
   if (DEPURAR) {
     elMedidas.hidden = false;
     elMedidas.textContent = medidas
-      ? DEDOS.map((d) => `${d.padEnd(8)}${medidas[d].toFixed(2).padStart(6)}  ${dedos[d] ? '▲' : '·'}`).join('\n')
+      ? [
+          ...DEDOS.map((d) => `${d.padEnd(8)}${medidas[d].toFixed(2).padStart(6)}  ${dedos[d] ? '▲' : '·'}`),
+          `inclin. ${inclinacion.grados.toFixed(0).padStart(5)}°  ${variante ?? '·'}${inclinacion.referencia === 'pulgar' ? ' (pulgar)' : ''}`,
+        ].join('\n')
       : 'sin mano';
   }
 }
@@ -439,6 +516,8 @@ async function iniciar() {
 
 armarGuia();
 armarControles();
+elInclinacion.style.setProperty('--umbral', `${(UMBRALES.inclinacion.entrar / RANGO_DEL_INDICADOR) * 50}%`);
+mostrarInclinacion(null);
 mostrarAcorde(null);
 mostrarPista(`Mostrá tu mano ${MANO.nombre} a la cámara.`);
 

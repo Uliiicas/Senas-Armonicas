@@ -180,6 +180,24 @@ ol {
   color: var(--acento);
   font-variant-numeric: lining-nums;
   transform-origin: left 70%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.07em;
+}
+
+/* Etiqueta del acorde suspendido, junto al número del grado. */
+.acorde__sus {
+  margin-top: 0.7em;
+  padding: 0.28em 0.6em 0.32em;
+  border-radius: 999px;
+  background: var(--acento);
+  color: rgb(var(--velo));
+  font-family: var(--letra-texto);
+  font-weight: 600;
+  font-size: 0.17em;
+  line-height: 1;
+  letter-spacing: 0;
+  text-shadow: none;
 }
 
 .acorde__grado.entra {
@@ -233,6 +251,56 @@ ol {
 
 .acorde__detalle span + span {
   margin-left: 0.9em;
+}
+
+/* Indicador de inclinación: ladear la mano lleva el punto hacia sus2 o sus4. */
+.inclinacion {
+  --posicion: 50%;
+  --umbral: 20.8%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--marfil-suave);
+  text-shadow: none;
+  transition: opacity 160ms ease;
+}
+
+.inclinacion[data-mano="no"] {
+  opacity: 0.45;
+}
+
+/* El tramo del medio es la mano derecha (acorde normal); los extremos, los sus. */
+.inclinacion__riel {
+  position: relative;
+  width: 6.5rem;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--marfil-suave) calc(50% - var(--umbral)),
+    var(--marfil-tenue) calc(50% - var(--umbral)) calc(50% + var(--umbral)),
+    var(--marfil-suave) calc(50% + var(--umbral))
+  );
+}
+
+.inclinacion__punto {
+  position: absolute;
+  top: 50%;
+  left: var(--posicion);
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--marfil);
+  box-shadow: 0 0 0 2px rgb(var(--velo) / 0.6);
+}
+
+.inclinacion__lado[data-activo="si"] {
+  color: var(--acento);
 }
 
 /* Sin acorde: no hay número; el nombre baja de volumen. */
@@ -598,6 +666,10 @@ ol {
   .acorde__nombre {
     flex-wrap: wrap;
     row-gap: 0.3em;
+  }
+
+  .acorde__grado {
+    flex-wrap: wrap;
   }
 
   .instrumentos {

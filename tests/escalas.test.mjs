@@ -35,3 +35,40 @@ test('otras tonalidades se escriben con las alteraciones correctas', () => {
     ['Mi♭', 'Fa', 'Sol', 'La♭', 'Si♭', 'Do', 'Re'],
   );
 });
+
+test('cada grado de Do Mayor tiene sus variantes sus2 y sus4', () => {
+  const { acordes } = ESCALAS['do-mayor'];
+  const fila = (v) => [v.romano, v.nombre, v.cifrado, v.notas.join(' ')];
+  assert.deepEqual(acordes.map((a) => fila(a.variantes.sus4)), [
+    ['I', 'Do sus4', 'Csus4', 'Do Fa Sol'],
+    ['II', 'Re sus4', 'Dsus4', 'Re Sol La'],
+    ['III', 'Mi sus4', 'Esus4', 'Mi La Si'],
+    ['IV', 'Fa sus4', 'Fsus4', 'Fa Si♭ Do'],
+    ['V', 'Sol sus4', 'Gsus4', 'Sol Do Re'],
+    ['VI', 'La sus4', 'Asus4', 'La Re Mi'],
+    ['VII', 'Si sus4 (♭5)', 'Bsus4(♭5)', 'Si Mi Fa'],
+  ]);
+  assert.deepEqual(acordes.map((a) => fila(a.variantes.sus2)), [
+    ['I', 'Do sus2', 'Csus2', 'Do Re Sol'],
+    ['II', 'Re sus2', 'Dsus2', 'Re Mi La'],
+    ['III', 'Mi sus2', 'Esus2', 'Mi Fa♯ Si'],
+    ['IV', 'Fa sus2', 'Fsus2', 'Fa Sol Do'],
+    ['V', 'Sol sus2', 'Gsus2', 'Sol La Re'],
+    ['VI', 'La sus2', 'Asus2', 'La Si Mi'],
+    ['VII', 'Si sus2 (♭5)', 'Bsus2(♭5)', 'Si Do♯ Fa'],
+  ]);
+});
+
+test('las variantes sus cambian solo la tercera', () => {
+  const { acordes } = ESCALAS['do-mayor'];
+  assert.deepEqual(acordes[0].variantes.sus4.midi, [60, 65, 67]);
+  assert.deepEqual(acordes[0].variantes.sus2.midi, [60, 62, 67]);
+  assert.deepEqual(acordes[3].variantes.sus4.midi, [65, 70, 72]);
+  for (const acorde of acordes) {
+    for (const v of Object.values(acorde.variantes)) {
+      assert.equal(v.midi[0], acorde.midi[0]);
+      assert.equal(v.midi[2], acorde.midi[2]);
+      assert.equal(v.grado, acorde.grado);
+    }
+  }
+});
