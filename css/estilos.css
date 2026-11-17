@@ -303,6 +303,51 @@ ol {
   color: var(--acento);
 }
 
+/* Séptima, junto al número del grado, como en el cifrado romano (V⁷). */
+.acorde__siete {
+  margin-top: 0.06em;
+  margin-left: -0.03em;
+  font-size: 0.42em;
+  line-height: 1;
+}
+
+/* Indicador de séptima: se enciende con la otra mano abierta. */
+.septima {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.7rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--marfil-suave);
+  text-shadow: none;
+  transition: opacity 160ms ease, color 160ms ease;
+}
+
+.septima[data-mano="no"] {
+  opacity: 0.45;
+}
+
+.septima__marca {
+  min-width: 2.1em;
+  padding: 0.28em 0.5em 0.3em;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  text-align: center;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.septima[data-activa="si"] {
+  color: var(--acento);
+}
+
+.septima[data-activa="si"] .septima__marca {
+  border-color: var(--acento);
+  background: var(--acento);
+  color: rgb(var(--velo));
+}
+
 /* Sin acorde: no hay número; el nombre baja de volumen. */
 .acorde[data-vacio="si"] .acorde__grado {
   display: none;
@@ -727,7 +772,9 @@ ol {
   }
 
   .aviso,
-  .guia__sena {
+  .guia__sena,
+  .septima,
+  .septima__marca {
     transition: none;
   }
 }

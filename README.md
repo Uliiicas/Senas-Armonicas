@@ -1,6 +1,6 @@
 # Señas Armónicas
 
-Aplicación web que reconoce señas de la mano con la cámara y las convierte en acordes de una escala, que suenan mientras se sostiene la seña. La cámara ocupa toda la página y el acorde en uso se muestra arriba a la izquierda.
+Aplicación web que reconoce señas de la mano con la cámara y las convierte en acordes de una escala, que suenan mientras se sostiene la seña. La mano derecha elige el acorde; la izquierda abierta le agrega la séptima. La cámara ocupa toda la página y el acorde en uso se muestra arriba a la izquierda.
 
 **Probala:** https://uliiicas.github.io/Senas-Armonicas/
 
@@ -8,7 +8,7 @@ Por ahora la única escala disponible es Do Mayor.
 
 ## Señas
 
-Se lee solo la **mano derecha**. Cada acorde de la escala tiene su seña:
+La **mano derecha** elige el acorde. Cada acorde de la escala tiene su seña:
 
 | Grado | Acorde en Do Mayor | Notas | Dedos levantados |
 |-------|--------------------|-------|------------------|
@@ -36,6 +36,26 @@ El acorde pasa a suspendido cuando la mano se inclina unos 25° y vuelve al norm
 
 En un acorde suspendido la tercera se reemplaza por la cuarta justa (sus4) o por la segunda mayor (sus2) sobre la fundamental, que es el significado habitual del cifrado. Por eso algunos usan una nota que no está en Do Mayor: Fa sus4 lleva Si♭, Mi sus2 lleva Fa♯ y Si sus2 lleva Do♯. El grado VII conserva su quinta disminuida y se escribe "sus4 (♭5)".
 
+## Mano izquierda abierta: séptima
+
+Con la **mano izquierda abierta** a la vista (índice, medio, anular y meñique estirados; el pulgar puede estar como quiera), el acorde que hace la derecha suena con su séptima: la nota de la escala que está una séptima arriba de la fundamental. Al cerrar la mano izquierda, o al sacarla de cuadro, el acorde vuelve a ser una tríada.
+
+| Grado | Con la izquierda abierta | Notas |
+|-------|--------------------------|-------|
+| I⁷ | Do séptima mayor (Cmaj7) | Do Mi Sol Si |
+| ii⁷ | Re menor séptima (Dm7) | Re Fa La Do |
+| iii⁷ | Mi menor séptima (Em7) | Mi Sol Si Re |
+| IV⁷ | Fa séptima mayor (Fmaj7) | Fa La Do Mi |
+| V⁷ | Sol séptima (G7) | Sol Si Re Fa |
+| vi⁷ | La menor séptima (Am7) | La Do Mi Sol |
+| viiø⁷ | Si semidisminuido (Bm7♭5) | Si Re Fa La |
+
+Se combina con la inclinación: la séptima también se agrega a los acordes suspendidos, por ejemplo Sol séptima sus4 (G7sus4: Sol Do Re Fa) o Do séptima mayor sus2 (Cmaj7sus2: Do Re Sol Si).
+
+Debajo del indicador de inclinación, la marca **7ª** se enciende mientras la mano izquierda está abierta, y esa mano se dibuja con el color del acorde. El cambio pasa por el mismo filtro temporal que las señas, así que abrir o cerrar la mano a medias no hace parpadear el acorde.
+
+Al sonar con séptima, la fundamental queda en el bajo (piano) o en el trombón grave (vientos), y arriba suenan tercera, quinta y séptima. Así la séptima mayor no queda pegada a medio tono de la fundamental.
+
 ## Sonido
 
 Arriba a la derecha están el selector de instrumento y la barra de volumen. La elección queda guardada en el navegador.
@@ -54,10 +74,11 @@ Algunos navegadores (sobre todo en celulares) no dejan sonar nada hasta que se t
 1. **Cámara.** `getUserMedia` abre la cámara del dispositivo. La frontal se muestra espejada; en celulares aparece un botón para pasar a la trasera.
 2. **Puntos de la mano.** [MediaPipe Hand Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/hand_landmarker) ubica 21 puntos de cada mano en cada cuadro de video. Corre dentro del navegador (WebAssembly, con GPU si está disponible): el video no se envía a ningún servidor.
 3. **Dedos levantados.** Con esos puntos en 3D, `js/gestos.js` mide qué tan estirado está cada dedo y cuánto se abre el pulgar. Las medidas no dependen del tamaño ni de la orientación de la mano, y usan dos umbrales (histéresis) para que un dedo a medio camino no parpadee.
-4. **Seña → grado.** La combinación de dedos se busca en la tabla `SENAS`. Una seña nueva se acepta recién cuando se sostiene unos 110 ms, así el acorde no salta mientras los dedos se mueven.
+4. **Seña → grado.** La combinación de dedos de la mano derecha se busca en la tabla `SENAS`. Una seña nueva se acepta recién cuando se sostiene unos 110 ms, así el acorde no salta mientras los dedos se mueven.
 5. **Inclinación → variante.** Se mide en la imagen el giro de la línea que va de la muñeca al nudillo del dedo medio. Esa línea sigue al antebrazo, así que no depende de qué dedos estén levantados.
-6. **Grado → acorde.** `js/escalas.js` arma la escala y la tríada de cada grado, con sus variantes sus2 y sus4, sus notas y números MIDI.
-7. **Acorde → sonido.** `js/voces.js` reparte las notas entre las voces del instrumento (bajo y tríada en el piano; trombones y trompetas en los vientos), buscando que cada voz se mueva poco al cambiar de acorde. `js/instrumentos.js` sintetiza cada voz y `js/sonido.js` las pasa por reverberación, volumen y un limitador que evita la saturación.
+6. **Mano izquierda → séptima.** La otra mano se mide igual que la derecha; si tiene los cuatro dedos estirados (`esManoAbierta`), el acorde lleva séptima.
+7. **Grado → acorde.** `js/escalas.js` arma la escala y la tríada de cada grado, con sus variantes sus2 y sus4, la versión con séptima de cada una, sus notas y números MIDI.
+8. **Acorde → sonido.** `js/voces.js` reparte las notas entre las voces del instrumento (bajo y tríada en el piano; trombones y trompetas en los vientos), buscando que cada voz se mueva poco al cambiar de acorde. `js/instrumentos.js` sintetiza cada voz y `js/sonido.js` las pasa por reverberación, volumen y un limitador que evita la saturación.
 
 ## Estructura
 
@@ -66,8 +87,8 @@ index.html            página única
 css/estilos.css       diseño
 js/app.js             cámara, bucle de reconocimiento y pantalla
 js/detector.js        carga de MediaPipe (único módulo que lo conoce)
-js/gestos.js          dedos levantados, tabla de señas, inclinación y filtro temporal
-js/escalas.js         escalas y acordes
+js/gestos.js          dedos levantados, tabla de señas, inclinación, mano abierta y filtro temporal
+js/escalas.js         escalas y acordes (tríadas, sus y con séptima)
 js/voces.js           qué nota toca cada voz de cada instrumento
 js/instrumentos.js    síntesis del piano eléctrico y de los vientos
 js/sonido.js          cadena de audio: efectos, volumen y limitador
@@ -92,8 +113,8 @@ Hace falta conexión a internet la primera vez, para descargar MediaPipe y el mo
 
 ### Opciones por dirección
 
-- `?mano=izquierda` lee la mano izquierda en lugar de la derecha.
-- `?debug` muestra en pantalla la medida de cada dedo y los grados de inclinación, útil para ajustar los umbrales de `js/gestos.js`.
+- `?mano=izquierda` invierte los papeles: la izquierda elige el acorde y la derecha abierta agrega la séptima.
+- `?debug` muestra en pantalla la medida de cada dedo, los grados de inclinación y los dedos de la mano izquierda, útil para ajustar los umbrales de `js/gestos.js`.
 
 ## Pruebas
 
@@ -101,7 +122,7 @@ Hace falta conexión a internet la primera vez, para descargar MediaPipe y el mo
 npm test
 ```
 
-Las pruebas usan un modelo geométrico de mano (`tests/mano-sintetica.mjs`) para verificar la tabla de señas, la histéresis, la inclinación, el filtro temporal, la construcción de acordes y el reparto de voces. No reemplazan la prueba con una mano real frente a la cámara ni escuchar los instrumentos.
+Las pruebas usan un modelo geométrico de mano (`tests/mano-sintetica.mjs`) para verificar la tabla de señas, la histéresis, la inclinación, la mano abierta, el filtro temporal, la construcción de acordes y el reparto de voces. No reemplazan la prueba con una mano real frente a la cámara ni escuchar los instrumentos.
 
 ## Ramas
 

@@ -11,6 +11,7 @@ import {
   medirInclinacion,
   actualizarVariante,
   esSoloPulgar,
+  esManoAbierta,
 } from '../js/gestos.js';
 import { manoLocal, girar, conRuido, azarConSemilla, formaDeLaSena, aImagen } from './mano-sintetica.mjs';
 
@@ -189,4 +190,27 @@ test('actualizarVariante: afuera es sus4, adentro es sus2, con histéresis', () 
   assert.equal(actualizarVariante('sus4', -20), null, 'no se hereda el lado contrario');
   assert.equal(actualizarVariante('sus2', 40), 'sus4');
   assert.equal(actualizarVariante('sus4', 170), null, 'mano cabeza abajo: no se interpreta');
+});
+
+test('la mano abierta (la que agrega la séptima) se reconoce con el pulgar en cualquier postura', () => {
+  const abierta = (pulgar) => actualizarDedos(null, medirDedos(manoLocal({ curvatura: [0.05, 0.05, 0.05, 0.05], pulgar })));
+  for (const pulgar of ['abierto', 'relajado', 'pegado', 'cruzado']) {
+    assert.ok(esManoAbierta(abierta(pulgar)), `pulgar ${pulgar}`);
+  }
+  const azar = azarConSemilla(11);
+  for (let i = 0; i < 200; i++) {
+    const giro = [(azar() - 0.5) * 1.4, (azar() - 0.5) * 1.4, (azar() - 0.5) * 2 * Math.PI];
+    const mano = conRuido(girar(manoLocal({ curvatura: [0.05, 0.05, 0.05, 0.05], pulgar: 'relajado' }), giro), 0.003, azar);
+    assert.ok(esManoAbierta(actualizarDedos(null, medirDedos(mano))), `giro ${i}`);
+  }
+});
+
+test('el puño, una seña a medias o la mano ausente no agregan séptima', () => {
+  const leerDedos = (curvatura) => actualizarDedos(null, medirDedos(manoLocal({ curvatura, pulgar: 'cruzado' })));
+  assert.equal(esManoAbierta(null), false);
+  assert.equal(esManoAbierta(leerDedos([0.95, 0.95, 0.95, 0.95])), false, 'puño');
+  assert.equal(esManoAbierta(leerDedos([0.05, 0.05, 0.05, 0.95])), false, 'tres dedos');
+  assert.equal(esManoAbierta(leerDedos([0.05, 0.95, 0.95, 0.95])), false, 'solo índice');
+  // Mano a medio cerrar: no alcanza para la séptima.
+  assert.equal(esManoAbierta(leerDedos([0.5, 0.5, 0.5, 0.5])), false, 'a medio cerrar');
 });

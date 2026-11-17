@@ -176,6 +176,16 @@ export function actualizarVariante(anterior, haciaAfuera, umbrales = UMBRALES.in
   return null;
 }
 
+/**
+ * Mano abierta: índice, medio, anular y meñique estirados. El pulgar no se
+ * tiene en cuenta, porque con la mano abierta y relajada suele quedar a medio
+ * camino y es el dedo que más cuesta leer.
+ * Con la otra mano (la izquierda, por defecto) abierta, el acorde lleva séptima.
+ */
+export function esManoAbierta(dedos) {
+  return Boolean(dedos?.indice && dedos.medio && dedos.anular && dedos.menique);
+}
+
 /** Indica si los dedos forman la seña de solo pulgar. */
 export function esSoloPulgar(dedos) {
   return dedos.pulgar && !dedos.indice && !dedos.medio && !dedos.anular && !dedos.menique;
@@ -229,9 +239,9 @@ export class Estabilizador {
   }
 
   /**
-   * @param {number|null} valor Grado leído en este cuadro.
+   * @param {number|string|null} valor Grado (o clave del acorde) leído en este cuadro.
    * @param {number} ahora Tiempo en ms (performance.now()).
-   * @returns {number|null} Grado estable.
+   * @returns {number|string|null} Valor estable.
    */
   actualizar(valor, ahora) {
     if (valor === this.actual) {

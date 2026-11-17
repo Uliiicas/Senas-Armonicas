@@ -72,3 +72,42 @@ test('las variantes sus cambian solo la tercera', () => {
     }
   }
 });
+
+test('cada grado de Do Mayor tiene su acorde con séptima', () => {
+  const { acordes } = ESCALAS['do-mayor'];
+  assert.deepEqual(
+    acordes.map((a) => [a.conSeptima.romano, a.conSeptima.nombre, a.conSeptima.cifrado, a.conSeptima.notas.join(' ')]),
+    [
+      ['I', 'Do séptima mayor', 'Cmaj7', 'Do Mi Sol Si'],
+      ['ii', 'Re menor séptima', 'Dm7', 'Re Fa La Do'],
+      ['iii', 'Mi menor séptima', 'Em7', 'Mi Sol Si Re'],
+      ['IV', 'Fa séptima mayor', 'Fmaj7', 'Fa La Do Mi'],
+      ['V', 'Sol séptima', 'G7', 'Sol Si Re Fa'],
+      ['vi', 'La menor séptima', 'Am7', 'La Do Mi Sol'],
+      ['viiø', 'Si semidisminuido', 'Bm7(♭5)', 'Si Re Fa La'],
+    ],
+  );
+  assert.deepEqual(acordes[0].conSeptima.midi, [60, 64, 67, 71]);
+  assert.deepEqual(acordes[4].conSeptima.midi, [67, 71, 74, 77]);
+  for (const acorde of acordes) {
+    assert.equal(acorde.septima, false);
+    assert.equal(acorde.conSeptima.septima, true);
+    assert.deepEqual(acorde.conSeptima.midi.slice(0, 3), acorde.midi, 'la tríada no cambia');
+  }
+});
+
+test('los acordes suspendidos también tienen su versión con séptima', () => {
+  const { acordes } = ESCALAS['do-mayor'];
+  const fila = (v) => [v.cifrado, v.notas.join(' ')];
+  assert.deepEqual(fila(acordes[0].variantes.sus4.conSeptima), ['Cmaj7sus4', 'Do Fa Sol Si']);
+  assert.deepEqual(fila(acordes[1].variantes.sus2.conSeptima), ['D7sus2', 'Re Mi La Do']);
+  assert.deepEqual(fila(acordes[4].variantes.sus4.conSeptima), ['G7sus4', 'Sol Do Re Fa']);
+  assert.deepEqual(fila(acordes[6].variantes.sus4.conSeptima), ['B7sus4(♭5)', 'Si Mi Fa La']);
+  assert.equal(acordes[4].variantes.sus4.conSeptima.nombre, 'Sol séptima sus4');
+  for (const acorde of acordes) {
+    for (const v of Object.values(acorde.variantes)) {
+      assert.equal(v.conSeptima.variante, v.variante);
+      assert.deepEqual(v.conSeptima.midi, [...v.midi, acorde.conSeptima.midi[3]], 'misma séptima de la escala');
+    }
+  }
+});

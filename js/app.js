@@ -13,6 +13,7 @@ import {
   medirInclinacion,
   actualizarVariante,
   esSoloPulgar,
+  esManoAbierta,
 } from './gestos.js';
 import { crearDetector } from './detector.js';
 import { ajustarLienzo, limpiar, dibujarMano } from './dibujo.js';
@@ -23,11 +24,12 @@ import { Sonido, VOLUMEN_INICIAL } from './sonido.js';
 
 const parametros = new URLSearchParams(location.search);
 
-// La app lee la mano derecha. Con ?mano=izquierda lee la otra.
+// Los acordes se eligen con la mano derecha y la izquierda abierta agrega la
+// séptima. Con ?mano=izquierda se invierten los papeles.
 const MANO =
   parametros.get('mano') === 'izquierda'
-    ? { etiqueta: 'Left', nombre: 'izquierda', otra: 'derecha' }
-    : { etiqueta: 'Right', nombre: 'derecha', otra: 'izquierda' };
+    ? { etiqueta: 'Left', nombre: 'izquierda', otra: 'derecha', etiquetaOtra: 'Right' }
+    : { etiqueta: 'Right', nombre: 'derecha', otra: 'izquierda', etiquetaOtra: 'Left' };
 
 // Con ?debug se muestran las medidas de cada dedo, para ajustar umbrales.
 const DEPURAR = parametros.has('debug');
@@ -72,6 +74,8 @@ const elMedidas = $('medidas');
 const elInclinacion = $('inclinacion');
 const ladoIzquierdo = $('lado-izquierdo');
 const ladoDerecho = $('lado-derecho');
+const elSeptima = $('septima');
+const elSeptimaTexto = $('septima-texto');
 const elInstrumentos = $('instrumentos');
 const barraVolumen = $('volumen');
 const botonSonido = $('activar-sonido');
@@ -83,11 +87,14 @@ const estabilizador = new Estabilizador();
 
 let detector = null;
 let orientacion = 'user'; // 'user' = cámara frontal, 'environment' = trasera
-let dedos = null; // dedos levantados de la mano que se está leyendo
+let dedos = null; // dedos levantados de la mano que elige el acorde
+let dedosDeLaOtra = null; // dedos levantados de la otra mano (la de la séptima)
 // Acorde en pantalla: undefined hasta el primer dibujo; después null o una
-// clave como '4' (grado IV) o '4:sus2' (grado IV suspendido).
+// clave como '4' (grado IV), '4:sus2' (grado IV suspendido), '4:7' (IV con
+// séptima) o '4:sus2:7' (las dos cosas).
 let claveActual;
 let variante = null; // 'sus2', 'sus4' o null según la inclinación de la mano
+let septima = false; // si la otra mano está abierta
 let referenciaDelPulgar = null; // referencia de inclinación mientras dura la seña de solo pulgar
 let inclinacionSuave = 0; // inclinación en pantalla, suavizada para el indicador
 let pistaActual = '';
@@ -219,12 +226,21 @@ function armarGuia() {
   );
 }
 
-/** Acorde que corresponde a una clave ('4', '4:sus2', ...) o null. */
+/** Clave del acorde: grado, variante suspendida y séptima. */
+function claveDe(grado, variante, septima) {
+  if (grado === null) return null;
+  return [grado, variante, septima ? '7' : null].filter(Boolean).join(':');
+}
+
+/** Acorde que corresponde a una clave ('4', '4:sus2', '4:7', '4:sus2:7') o null. */
 function acordeDe(clave) {
   if (clave === null || clave === undefined) return null;
-  const [grado, tipo] = clave.split(':');
-  const base = escala.acordes[Number(grado) - 1];
-  return tipo ? base.variantes[tipo] : base;
+  const [grado, ...extras] = clave.split(':');
+  let acorde = escala.acordes[Number(grado) - 1];
+  const tipo = extras.find((e) => e.startsWith('sus'));
+  if (tipo) acorde = acorde.variantes[tipo];
+  if (extras.includes('7')) acorde = acorde.conSeptima;
+  return acorde;
 }
 
 function mostrarAcorde(clave) {
@@ -236,6 +252,12 @@ function mostrarAcorde(clave) {
 
   if (acorde) {
     elGrado.textContent = acorde.romano;
+    if (acorde.septima) {
+      const marca = document.createElement('span');
+      marca.className = 'acorde__siete';
+      marca.textContent = '7';
+      elGrado.append(marca);
+    }
     if (acorde.variante) {
       const etiqueta = document.createElement('span');
       etiqueta.className = 'acorde__sus';
@@ -275,10 +297,24 @@ function mostrarAcorde(clave) {
 function quedarSinAcorde() {
   estabilizador.reiniciar();
   dedos = null;
+  dedosDeLaOtra = null;
   variante = null;
+  septima = false;
   referenciaDelPulgar = null;
   if (claveActual !== null) mostrarAcorde(null);
   mostrarInclinacion(null);
+  mostrarSeptima(false);
+}
+
+/**
+ * Indicador de séptima: se enciende con la otra mano abierta.
+ * @param {boolean} hayOtraMano Si la otra mano está a la vista.
+ */
+function mostrarSeptima(hayOtraMano) {
+  elSeptima.dataset.mano = hayOtraMano ? 'si' : 'no';
+  elSeptima.dataset.activa = septima ? 'si' : 'no';
+  const texto = septima ? `mano ${MANO.otra} abierta` : `abrí la mano ${MANO.otra}`;
+  if (elSeptimaTexto.textContent !== texto) elSeptimaTexto.textContent = texto;
 }
 
 /**
@@ -397,6 +433,8 @@ async function cambiarCamara() {
 
 function procesar(resultado, ahora) {
   const { indice, hayOtraMano } = elegirMano(resultado, MANO.etiqueta);
+  // Mano que agrega la séptima (la izquierda, salvo con ?mano=izquierda).
+  const otra = elegirMano(resultado, MANO.etiquetaOtra).indice;
   let grado = null;
   let medidas = null;
   let inclinacion = null;
@@ -424,34 +462,55 @@ function procesar(resultado, ahora) {
     referenciaDelPulgar = null;
   }
 
-  const clave = grado === null ? null : variante ? `${grado}:${variante}` : String(grado);
-  const estable = estabilizador.actualizar(clave, ahora);
+  // Otra mano abierta = séptima. Sin esa mano a la vista, el acorde va sin séptima.
+  let medidasDeLaOtra = null;
+  if (otra >= 0 && otra !== indice) {
+    medidasDeLaOtra = medirDedos(resultado.worldLandmarks[otra]);
+    dedosDeLaOtra = actualizarDedos(dedosDeLaOtra, medidasDeLaOtra);
+  } else {
+    dedosDeLaOtra = null;
+  }
+  septima = esManoAbierta(dedosDeLaOtra);
+
+  const estable = estabilizador.actualizar(claveDe(grado, variante, septima), ahora);
   if (estable !== claveActual) mostrarAcorde(estable);
   mostrarInclinacion(inclinacion ? inclinacion.grados : null);
+  mostrarSeptima(dedosDeLaOtra !== null);
 
   if (indice >= 0) {
     // Mientras una seña válida se está por confirmar, no se cambia el texto.
     if (grado === null) mostrarPista('Esa seña no tiene un acorde asignado.');
-  } else if (hayOtraMano) mostrarPista(`Esa es la mano ${MANO.otra}. Usá la ${MANO.nombre}.`);
-  else mostrarPista(`Mostrá tu mano ${MANO.nombre} a la cámara.`);
+  } else if (hayOtraMano) {
+    mostrarPista(`Los acordes se eligen con la mano ${MANO.nombre}; la ${MANO.otra} abierta agrega la séptima.`);
+  } else mostrarPista(`Mostrá tu mano ${MANO.nombre} a la cámara.`);
 
   // Trazo de las manos sobre el video.
   ajustarLienzo(lienzo);
   limpiar(lienzo);
   const acorde = acordeDe(estable);
+  const color = acorde ? colorDe(acorde) : '#f7f0e3';
   (resultado.landmarks ?? []).forEach((puntos, i) => {
-    if (i === indice) dibujarMano(lienzo, video, puntos, { dedos, color: acorde ? colorDe(acorde) : '#f7f0e3' });
+    if (i === indice) dibujarMano(lienzo, video, puntos, { dedos, color });
+    // La otra mano se ve con sus dedos marcados solo cuando está abierta.
+    else if (i === otra && septima) dibujarMano(lienzo, video, puntos, { dedos: dedosDeLaOtra, color });
     else dibujarMano(lienzo, video, puntos);
   });
 
   if (DEPURAR) {
     elMedidas.hidden = false;
-    elMedidas.textContent = medidas
+    const lineas = medidas
       ? [
           ...DEDOS.map((d) => `${d.padEnd(8)}${medidas[d].toFixed(2).padStart(6)}  ${dedos[d] ? '▲' : '·'}`),
           `inclin. ${inclinacion.grados.toFixed(0).padStart(5)}°  ${variante ?? '·'}${inclinacion.referencia === 'pulgar' ? ' (pulgar)' : ''}`,
-        ].join('\n')
-      : 'sin mano';
+        ]
+      : ['sin mano'];
+    lineas.push(
+      '',
+      medidasDeLaOtra
+        ? `${MANO.otra}: ${DEDOS.slice(1).map((d) => medidasDeLaOtra[d].toFixed(2)).join(' ')}  7ª ${septima ? '▲' : '·'}`
+        : `${MANO.otra}: sin mano`,
+    );
+    elMedidas.textContent = lineas.join('\n');
   }
 }
 
@@ -518,6 +577,7 @@ armarGuia();
 armarControles();
 elInclinacion.style.setProperty('--umbral', `${(UMBRALES.inclinacion.entrar / RANGO_DEL_INDICADOR) * 50}%`);
 mostrarInclinacion(null);
+mostrarSeptima(false);
 mostrarAcorde(null);
 mostrarPista(`Mostrá tu mano ${MANO.nombre} a la cámara.`);
 

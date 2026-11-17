@@ -1,4 +1,5 @@
-// Teoría musical: construye una escala y los acordes (tríadas) de cada grado.
+// Teoría musical: construye una escala y los acordes de cada grado: la
+// tríada, sus variantes suspendidas y la versión con séptima de cada una.
 // No depende del navegador, así que se puede probar con `node --test`.
 
 const LETRAS = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
@@ -25,6 +26,20 @@ const CALIDADES = {
 export const SUSPENSIONES = {
   sus2: { letras: 1, semitonos: 2 },
   sus4: { letras: 3, semitonos: 5 },
+};
+
+/**
+ * Acordes con séptima (cuatríadas), según los intervalos de tercera, quinta
+ * y séptima sobre la fundamental. `romano` recibe el número del grado.
+ */
+const SEPTIMAS = {
+  '4-7-11': { nombre: 'séptima mayor', sufijo: 'maj7', romano: (r) => r },
+  '4-7-10': { nombre: 'séptima', sufijo: '7', romano: (r) => r },
+  '3-7-10': { nombre: 'menor séptima', sufijo: 'm7', romano: (r) => r.toLowerCase() },
+  '3-6-10': { nombre: 'semidisminuido', sufijo: 'm7(♭5)', romano: (r) => `${r.toLowerCase()}ø` },
+  '3-6-9': { nombre: 'disminuido séptima', sufijo: '°7', romano: (r) => `${r.toLowerCase()}°` },
+  '3-7-11': { nombre: 'menor séptima mayor', sufijo: 'm(maj7)', romano: (r) => r.toLowerCase() },
+  '4-8-11': { nombre: 'aumentado séptima mayor', sufijo: '+(maj7)', romano: (r) => `${r}+` },
 };
 
 /** Alteración que necesita una letra para sonar a cierta altura. */
@@ -73,40 +88,72 @@ export function construirEscala({ tonica, alteracion = 0, modo = 'mayor', octava
   const acordes = notas.map((raiz, i) => {
     const tercera = notas[(i + 2) % 7];
     const quinta = notas[(i + 4) % 7];
+    const septima = notas[(i + 6) % 7];
     const alturaTercera = tercera.altura + (i + 2 >= 7 ? 12 : 0);
     const alturaQuinta = quinta.altura + (i + 4 >= 7 ? 12 : 0);
-    const clave = `${alturaTercera - raiz.altura}-${alturaQuinta - raiz.altura}`;
-    const calidad = CALIDADES[clave];
+    const alturaSeptima = septima.altura + (i + 6 >= 7 ? 12 : 0);
+    const intervalo = (altura) => altura - raiz.altura;
+    const calidad = CALIDADES[`${intervalo(alturaTercera)}-${intervalo(alturaQuinta)}`];
+    const cuatriada =
+      SEPTIMAS[`${intervalo(alturaTercera)}-${intervalo(alturaQuinta)}-${intervalo(alturaSeptima)}`];
     const baseMidi = 12 * (octava + 1);
+    const aMidi = (alturas) => alturas.map((a) => baseMidi + a);
 
     // Variantes suspendidas: misma fundamental y misma quinta, sin tercera.
     // Con la quinta disminuida (grado vii°) se aclara en el nombre.
-    const quintaJusta = alturaQuinta - raiz.altura === 7;
+    // Cada una tiene a su vez su versión con la séptima de la escala.
+    const quintaJusta = intervalo(alturaQuinta) === 7;
+    const septimaMayor = intervalo(alturaSeptima) === 11;
     const variantes = {};
     for (const [tipo, { letras, semitonos }] of Object.entries(SUSPENSIONES)) {
       const letra = (raiz.letra + letras) % 7;
       const signo = signoDeAlteracion(alteracionPara(letra, raiz.altura + semitonos));
-      variantes[tipo] = {
+      const bemol5 = quintaJusta ? '' : '(♭5)';
+      const triada = {
         grado: i + 1,
         variante: tipo,
+        septima: false,
         romano: ROMANOS[i],
         nombre: `${raiz.nombre} ${tipo}${quintaJusta ? '' : ' (♭5)'}`,
-        cifrado: `${raiz.cifrado}${tipo}${quintaJusta ? '' : '(♭5)'}`,
+        cifrado: `${raiz.cifrado}${tipo}${bemol5}`,
         calidad: tipo,
         notas: [raiz.nombre, LETRAS[letra] + signo, quinta.nombre],
-        midi: [raiz.altura, raiz.altura + semitonos, alturaQuinta].map((a) => baseMidi + a),
+        midi: aMidi([raiz.altura, raiz.altura + semitonos, alturaQuinta]),
       };
+      triada.conSeptima = {
+        ...triada,
+        septima: true,
+        nombre: `${raiz.nombre} ${septimaMayor ? 'séptima mayor' : 'séptima'} ${tipo}${quintaJusta ? '' : ' (♭5)'}`,
+        cifrado: `${raiz.cifrado}${septimaMayor ? 'maj7' : '7'}${tipo}${bemol5}`,
+        calidad: `${septimaMayor ? 'maj7' : '7'}${tipo}`,
+        notas: [...triada.notas, septima.nombre],
+        midi: [...triada.midi, baseMidi + alturaSeptima],
+      };
+      variantes[tipo] = triada;
     }
 
     return {
       grado: i + 1,
       variante: null,
+      septima: false,
       romano: calidad.romano(ROMANOS[i]),
       nombre: `${raiz.nombre} ${calidad.nombre}`,
       cifrado: raiz.cifrado + calidad.sufijo,
       calidad: calidad.nombre,
       notas: [raiz.nombre, tercera.nombre, quinta.nombre],
-      midi: [raiz.altura, alturaTercera, alturaQuinta].map((a) => baseMidi + a),
+      midi: aMidi([raiz.altura, alturaTercera, alturaQuinta]),
+      // El mismo acorde con la séptima de la escala agregada arriba.
+      conSeptima: {
+        grado: i + 1,
+        variante: null,
+        septima: true,
+        romano: cuatriada.romano(ROMANOS[i]),
+        nombre: `${raiz.nombre} ${cuatriada.nombre}`,
+        cifrado: raiz.cifrado + cuatriada.sufijo,
+        calidad: cuatriada.nombre,
+        notas: [raiz.nombre, tercera.nombre, quinta.nombre, septima.nombre],
+        midi: aMidi([raiz.altura, alturaTercera, alturaQuinta, alturaSeptima]),
+      },
       variantes,
     };
   });
